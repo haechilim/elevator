@@ -1,0 +1,319 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>엘리베이터</title>
+    <style>
+    	* { padding: 0; margin: 0; }
+    	body { font-size: 20px; }
+		div.container { width: 450px; margin: 30px auto; }
+		div.inline { display: inline-block; vertical-align: top; }
+		div.floor { width: 50px; margin: 10px 10px; text-align: right; }
+		div.outdoor input { width: 40px; height:40px; }
+		div.indoor { margin-left: 50px; }
+		div.indoor input { width: 60px; height:37px; margin-left: 0px; margin-bottom: 5px; font-size:20px; }
+		div.elevator-container { position:relative; width:95px; }
+		div.elevator { position:absolute; top: 0px; width:90px; height:37px; border:1px #bbb solid; background-color:#00dcff; text-align:center; }
+		#elevator-door { font-size:11px; margin-top: -5px; color: #ff0000; display:none; }
+    </style>
+</head>
+
+<body>
+	<div class="container">
+		<div id="outdoor" class="inline outdoor"></div>
+		
+		<div class="inline elevator-container">
+			<div id="elevator" class="elevator">
+				<div id="elevator-text">승강기</div>
+				<div id="elevator-door">문열림</div>
+			</div>
+		</div>
+		
+		<div id="indoor" class="inline indoor"></div>
+	</div>
+
+	<script>
+		var MIN_FLOOR = 1;
+		var MAX_FLOOR = 10;
+
+		var STOP = 0;
+		var NONE = 0;
+		var UP = 1;
+		var DOWN = -1;
+		var BOTH = 2;
+
+		var floor = 1;
+		var direction = STOP;
+		var stops = [];
+		
+		function run() {
+			updateElevator();
+			
+			if(direction == STOP) {
+				if(shouldOpenDoor()) {
+					turnOffUpButton();
+					turnOffDownButton();
+					openDoor(true);
+				}
+
+				decideDirection();
+			}
+			else {
+				if(direction == UP) {
+					if(shouldOpenDoor()) {
+						turnOffUpButton();
+						openDoor(true);
+					}
+
+					if(shouldStop()) direction = STOP;
+					else if(!shouldGoUp()) {
+						direction = DOWN;
+						run();
+						return;
+					}
+				}
+				else if(direction == DOWN) {
+					if(shouldOpenDoor()) {
+						turnOffDownButton();
+						openDoor(true);
+					}
+
+					if(shouldStop()) direction = STOP;
+					else if(!shouldGoDown()) {
+						direction = UP;
+						run();
+						return;
+					}
+				}
+			}
+
+			floor += direction;
+
+			if(floor > MAX_FLOOR) {
+				floor = MAX_FLOOR;
+				direction = STOP;
+			}
+			else if(floor < MIN_FLOOR) {
+				floor = MIN_FLOOR;
+				direction = STOP;
+			}
+		}
+		
+		function initStops() {
+			for(var i = 0; i < MAX_FLOOR; i++) {
+				stops.push(NONE);
+			}
+		}
+		
+		function printStops() {
+			var msg = "";
+			
+			for(var i = 0; i < stops.length; i++) {
+				msg += stops[i] + " ";
+			}
+
+			console.log(msg);
+		}
+
+		function shouldOpenDoor() {
+			if(direction == UP) {
+				if(stops[floor - 1] == UP || stops[floor - 1] == BOTH) return true;
+			}
+			else if(direction == DOWN) {
+				if(stops[floor - 1] == DOWN || stops[floor - 1] == BOTH) return true;
+			}
+			else if(direction == STOP) {
+				if(stops[floor - 1] != NONE) return true;
+			}
+
+			return false;
+		}
+
+		function shouldStop() {
+			for(var i = 0; i < stops.length; i++) {
+				if(stops[i] != NONE) return false;
+			}
+
+			return true;
+		}
+
+		function decideDirection() {
+			for (var i = 0; i < stops.length; i++) {
+				if (stops[i] != NONE) {
+					var floorToGo = i + 1;
+
+					if (floor < floorToGo) direction = UP;
+					else if (floor > floorToGo) direction = DOWN;
+					break;
+				}
+			}
+		}
+
+		function shouldGoUp() {
+			for(var i = floor; i < stops.length; i++) {
+				if(stops[i] != NONE) return true;
+			}
+
+			return false;
+		}
+
+		function shouldGoDown() {
+			for(var i = floor - 2; i >= 0; i--) {
+				if(stops[i] != NONE) return true;
+			}
+
+			return false;
+		}
+
+		function turnOffUpButton() {
+			if(stops[floor - 1] == BOTH) stops[floor - 1] = DOWN;
+			else if(stops[floor - 1] == UP) stops[floor - 1] = NONE;
+			
+			switchUpButton(floor, false);
+		}
+
+		function turnOffDownButton() {
+			if(stops[floor - 1] == BOTH) stops[floor - 1] = UP;
+			else if(stops[floor - 1] == DOWN) stops[floor - 1] = NONE;
+			
+			switchDownButton(floor, false);
+		}
+		
+		function pushUpButton(floor) {
+			stops[floor - 1] = stops[floor - 1] == DOWN ? BOTH : UP;
+			
+			switchUpButton(floor, true);
+		}
+		
+		function pushDownButton(floor) {
+			stops[floor - 1] = stops[floor - 1] == UP ? BOTH : DOWN;
+			
+			switchDownButton(floor, true);
+		}
+		
+		function pushIndoorButton(number) {
+			if(number > floor) stops[number - 1] = stops[number - 1] == DOWN ? BOTH : UP;
+            else if(number < floor) stops[number - 1] = stops[number - 1] == UP ? BOTH : DOWN;
+			
+			switchNumberButton(number, true);
+		}
+	
+	
+	
+		////////////////////////////////////////////////////////////////////////////////
+		//	화면표시를 위한 함수들
+		////////////////////////////////////////////////////////////////////////////////
+		var timerId;
+		var ELEVATOR_SPEED = 2000;
+	
+		window.onload = function() {
+			initStops();
+			
+			createOutdoorButtons();
+			createIndoorButtons();
+			updateElevator();
+			runTimer(true);
+		}
+		
+		function runTimer(start) {
+			if(timerId) clearInterval(timerId);
+			if(start) timerId = setInterval(run, ELEVATOR_SPEED);
+		}
+		
+		function switchUpButton(floor, on) {
+			switchButton("upButton" + floor, on);
+		}
+		
+		function switchDownButton(floor, on) {
+			switchButton("downButton" + floor, on);
+		}
+		
+		function switchNumberButton(floor, on) {
+			switchButton("numberButton" + floor, on);
+		}
+		
+		function switchButton(id, on) {
+			var button = document.getElementById(id);
+			button.style.color = on ? "#ff0000" : "#000";
+		}
+		
+		function updateElevator() {
+			var elevator = document.getElementById("elevator");
+			var outdoorButton = document.getElementById("downButton" + floor);
+			var top = outdoorButton.getBoundingClientRect().top - 30;
+			elevator.style.top = top + "px";
+
+			var elevatorText = document.getElementById("elevator-text");
+			var text = "승강기";
+			if(direction == UP) text += "↑";
+			else if(direction == DOWN) text += "↓";
+			elevatorText.innerText = text;
+		}
+		
+		function openDoor(open) {
+			var elevatorDoor = document.getElementById("elevator-door");
+			elevatorDoor.style.display = open ? "block" : "none";
+			
+			if(open) {
+				runTimer(false);
+				
+				setTimeout(function() {
+					openDoor(false);
+					runTimer(true);
+				}, ELEVATOR_SPEED);
+			}
+			
+			switchNumberButton(floor, false);
+		}
+		
+		function createOutdoorButtons() {
+			var outdoor = document.getElementById("outdoor");
+			var div, button, br;
+			
+			for(var i = stops.length -1; i >= 0; i--) {
+				div = document.createElement("div");
+				div.className = "inline floor";
+				div.innerText = (i+1) + "층";
+				outdoor.appendChild(div);
+				
+				button = createButton("▲", "pushUpButton(" + (i+1) + ")");
+				button.setAttribute("id", "upButton" + (i+1));
+				if(i == stops.length -1) button.style.visibility = "hidden";
+				outdoor.appendChild(button);
+				
+				button = createButton("▼", "pushDownButton(" + (i+1) + ")");
+				button.setAttribute("id", "downButton" + (i+1));
+				if(i == 0) button.style.visibility = "hidden";
+				outdoor.appendChild(button);
+				
+				br = document.createElement("br");
+				outdoor.appendChild(br);
+			}
+		}
+		
+		function createIndoorButtons() {
+			var indoor = document.getElementById("indoor");
+			var button, br;
+			
+			for(var i = stops.length -1; i >= 0; i--) {
+				button = createButton(i + 1, "pushIndoorButton(" + (i+1) + ")");
+				button.setAttribute("id", "numberButton" + (i+1));
+				indoor.appendChild(button);
+				
+				if(i % 2 == 0) {
+					br = document.createElement("br");
+					indoor.appendChild(br);
+				}
+			}
+		}
+		
+		function createButton(text, func) {
+			var button = document.createElement("input");
+			button.setAttribute("type", "button");
+			button.setAttribute("value", text);
+			button.setAttribute("onclick", func);
+			return button;
+		}
+	</script>
+</body>
+</html>
