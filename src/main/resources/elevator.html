@@ -36,20 +36,25 @@
 		var MIN_FLOOR = -5;
         var MAX_FLOOR = 10;
 
-		var STOP = 0;
-		var NONE = 0;
-		var UP = 1;
-		var DOWN = -1;
-		var BOTH = 2;
+		//	엘리베이터 상태값
+		var STOPPED = 0;		// 멈춰있음
+		var GOING_UP = 1;		// 올라가는중
+		var GOING_DOWN = 2;		// 내려가는중
 
-		var stopIndex = floorToIndex(1);
-		var direction = STOP;
-		var stops = [];
+		//	층 버튼 상태값
+		var NOTHING = 0;		// 아무 버튼도 안 눌려짐
+		var UP_BUTTON = 1;		// 위 버튼 눌려짐
+		var DOWN_BUTTON = 2;	// 아래 버튼 눌려짐
+		var BOTH_BUTTON = 3;	// 위, 아래 버튼 둘다 눌려짐
+
+		var currentIndex = floorToIndex(1);
+		var status = STOPPED;
+		var floors = [];
 		
 		function run() {
-			updateElevator();
+			redrawElevator();
 			
-			if(direction == STOP) {
+			if(status == STOPPED) {
 				if(shouldOpenDoor()) {
 					turnOffUpButton();
 					turnOffDownButton();
@@ -59,167 +64,152 @@
 				decideDirection();
 			}
 			else {
-				if(direction == UP) {
+				if(status == GOING_UP) {
 					if(shouldOpenDoor()) {
 						turnOffUpButton();
 						openDoor(true);
 					}
 
-					if(shouldStop()) direction = STOP;
-					else if(!shouldGoUp()) {
-						direction = DOWN;
-						//run();
+					if(shouldStop()) status = STOPPED;
+					else if(!shouldKeepGoingUp()) {
+						status = GOING_DOWN;
 						return;
 					}
 				}
-				else if(direction == DOWN) {
+				else if(status == GOING_DOWN) {
 					if(shouldOpenDoor()) {
 						turnOffDownButton();
 						openDoor(true);
 					}
 
-					if(shouldStop()) direction = STOP;
-					else if(!shouldGoDown()) {
-						direction = UP;
-						//run();
+					if(shouldStop()) status = STOPPED;
+					else if(!shouldKeepGoingDown()) {
+						status = GOING_UP;
 						return;
 					}
 				}
 			}
 
-			stopIndex += direction;
-			
-			if(stopIndex > stops.length - 1) {
-				stopIndex = stops.length - 1;
-				direction = STOP;
-			}
-			else if(stopIndex < 0) {
-				stopIndex = 0;
-				direction = STOP;
-			}
-		}
-		
-		function floorToIndex(f) {
-			if(MIN_FLOOR > 0) return f - MIN_FLOOR;
-			else if(MIN_FLOOR < 0) {
-				if(f < 0) return f - MIN_FLOOR;
-				else if(f > 0) return f - MIN_FLOOR - 1;
-			}
-			
-			return 0;
-		}
-		
-		function indexToFloor(index) {
-			if(MIN_FLOOR > 0) return index + MIN_FLOOR;
-			else if(MIN_FLOOR < 0) {
-				if(index >= Math.abs(MIN_FLOOR)) return index + MIN_FLOOR + 1;
-				else return index + MIN_FLOOR;
-			}
-			
-			return 1;
-		}
-		
-		function initStops() {
-			var count = 0;
-			
-			if(MIN_FLOOR > 0) count = MAX_FLOOR;
-			else if(MIN_FLOOR < 0) count = MAX_FLOOR + Math.abs(MIN_FLOOR);
-			
-			for(var i = 0; i < count; i++) {
-				stops.push(NONE);
-			}
-		}
-		
-		function printStops() {
-			var msg = "";
-			
-			for(var i = 0; i < stops.length; i++) {
-				msg += stops[i] + " ";
-			}
-
-			console.log(msg);
-		}
-
-		function shouldOpenDoor() {
-			if(direction == UP) {
-				if(stops[stopIndex] == UP || stops[stopIndex] == BOTH) return true;
-			}
-			else if(direction == DOWN) {
-				if(stops[stopIndex] == DOWN || stops[stopIndex] == BOTH) return true;
-			}
-			else if(direction == STOP) {
-				if(stops[stopIndex] != NONE) return true;
-			}
-
-			return false;
-		}
-
-		function shouldStop() {
-			for(var i = 0; i < stops.length; i++) {
-				if(stops[i] != NONE) return false;
-			}
-
-			return true;
+			move();
+            stopIfLastFloor();
 		}
 
 		function decideDirection() {
-			for (var i = 0; i < stops.length; i++) {
-				if (stops[i] != NONE) {
-					if (stopIndex < i) direction = UP;
-					else if (stopIndex > i) direction = DOWN;
+			for (var i = 0; i < floors.length; i++) {
+				if (floors[i] != NOTHING) {
+					if (currentIndex < i) status = GOING_UP;
+					else if (currentIndex > i) status = GOING_DOWN;
 					break;
 				}
 			}
 		}
 
-		function shouldGoUp() {
-			for(var i = stopIndex + 1; i < stops.length; i++) {
-				if(stops[i] != NONE) return true;
+        function move() {
+            if(status == GOING_UP) currentIndex++;
+            else if(status == GOING_DOWN) currentIndex--;
+        }
+
+        function stopIfLastFloor() {
+            if(currentIndex > floors.length - 1) {
+                currentIndex = floors.length - 1;
+                status = STOPPED;
+            }
+            else if(currentIndex < 0) {
+                currentIndex = 0;
+                status = STOPPED;
+            }
+        }
+
+        function shouldStop() {
+            for(var i = 0; i < floors.length; i++) {
+                if(floors[i] != NOTHING) return false;
+            }
+
+            return true;
+        }
+
+		function shouldKeepGoingUp() {
+			for(var i = currentIndex + 1; i < floors.length; i++) {
+				if(floors[i] != NOTHING) return true;
 			}
 
 			return false;
 		}
 
-		function shouldGoDown() {
-			for(var i = stopIndex - 1; i >= 0; i--) {
-				if(stops[i] != NONE) return true;
+		function shouldKeepGoingDown() {
+			for(var i = currentIndex - 1; i >= 0; i--) {
+				if(floors[i] != NOTHING) return true;
 			}
 
 			return false;
 		}
+
+        function shouldOpenDoor() {
+            if(status == GOING_UP) {
+                if(floors[currentIndex] == UP_BUTTON || floors[currentIndex] == BOTH_BUTTON) return true;
+            }
+            else if(status == GOING_DOWN) {
+                if(floors[currentIndex] == DOWN_BUTTON || floors[currentIndex] == BOTH_BUTTON) return true;
+            }
+            else if(status == STOPPED) {
+                if(floors[currentIndex] != NOTHING) return true;
+            }
+
+            return false;
+        }
 
 		function turnOffUpButton() {
-			if(stops[stopIndex] == BOTH) stops[stopIndex] = DOWN;
-			else if(stops[stopIndex] == UP) stops[stopIndex] = NONE;
+			if(floors[currentIndex] == BOTH_BUTTON) floors[currentIndex] = DOWN_BUTTON;
+			else if(floors[currentIndex] == UP_BUTTON) floors[currentIndex] = NOTHING;
 			
-			switchUpButton(stopIndex, false);
+			switchUpButton(currentIndex, false);
 		}
 
 		function turnOffDownButton() {
-			if(stops[stopIndex] == BOTH) stops[stopIndex] = UP;
-			else if(stops[stopIndex] == DOWN) stops[stopIndex] = NONE;
+			if(floors[currentIndex] == BOTH_BUTTON) floors[currentIndex] = UP_BUTTON;
+			else if(floors[currentIndex] == DOWN_BUTTON) floors[currentIndex] = NOTHING;
 			
-			switchDownButton(stopIndex, false);
+			switchDownButton(currentIndex, false);
 		}
 		
 		function pushUpButton(index) {
-			stops[index] = stops[index] == DOWN ? BOTH : UP;
-			
+			floors[index] = floors[index] == DOWN_BUTTON ? BOTH_BUTTON : UP_BUTTON;
+
 			switchUpButton(index, true);
 		}
-		
+
 		function pushDownButton(index) {
-			stops[index] = stops[index] == UP ? BOTH : DOWN;
-			
+			floors[index] = floors[index] == UP_BUTTON ? BOTH_BUTTON : DOWN_BUTTON;
+
 			switchDownButton(index, true);
 		}
-		
+
 		function pushIndoorButton(index) {
-			if(index > stopIndex) stops[index] = stops[index] == DOWN ? BOTH : UP;
-            else if(index < stopIndex) stops[index] = stops[index] == UP ? BOTH : DOWN;
-			
+			if(index > currentIndex) floors[index] = floors[index] == DOWN_BUTTON ? BOTH_BUTTON : UP_BUTTON;
+            else if(index < currentIndex) floors[index] = floors[index] == UP_BUTTON ? BOTH_BUTTON : DOWN_BUTTON;
+
 			switchNumberButton(index, true);
 		}
+
+        function floorToIndex(floor) {
+            if(MIN_FLOOR > 0) return floor - MIN_FLOOR;
+            else if(MIN_FLOOR < 0) {
+                if(floor < 0) return floor - MIN_FLOOR;
+                else if(floor > 0) return floor - MIN_FLOOR - 1;
+            }
+
+            return 0;
+        }
+
+        function indexToFloor(index) {
+            if(MIN_FLOOR > 0) return index + MIN_FLOOR;
+            else if(MIN_FLOOR < 0) {
+                if(index >= Math.abs(MIN_FLOOR)) return index + MIN_FLOOR + 1;
+                else return index + MIN_FLOOR;
+            }
+
+            return 1;
+        }
 	
 	
 	
@@ -234,9 +224,20 @@
 			
 			createOutdoorButtons();
 			createIndoorButtons();
-			updateElevator();
+			redrawElevator();
 			runTimer(true);
-		}
+		};
+
+        function initStops() {
+            var count = 0;
+
+            if(MIN_FLOOR > 0) count = MAX_FLOOR;
+            else if(MIN_FLOOR < 0) count = MAX_FLOOR + Math.abs(MIN_FLOOR);
+
+            for(var i = 0; i < count; i++) {
+                floors.push(NOTHING);
+            }
+        }
 		
 		function runTimer(start) {
 			if(timerId) clearInterval(timerId);
@@ -260,16 +261,16 @@
 			button.style.color = on ? "#ff0000" : "#000";
 		}
 		
-		function updateElevator() {
+		function redrawElevator() {
 			var elevator = document.getElementById("elevator");
-			var outdoorButton = document.getElementById("downButton" + stopIndex);
+			var outdoorButton = document.getElementById("downButton" + currentIndex);
 			var top = outdoorButton.getBoundingClientRect().top - 30;
 			elevator.style.top = top + "px";
 
 			var elevatorText = document.getElementById("elevator-text");
 			var text = "승강기";
-			if(direction == UP) text += "↑";
-			else if(direction == DOWN) text += "↓";
+			if(status == GOING_UP) text += "↑";
+			else if(status == GOING_DOWN) text += "↓";
 			elevatorText.innerText = text;
 		}
 		
@@ -286,14 +287,14 @@
 				}, ELEVATOR_SPEED);
 			}
 			
-			switchNumberButton(stopIndex, false);
+			switchNumberButton(currentIndex, false);
 		}
 		
 		function createOutdoorButtons() {
 			var outdoor = document.getElementById("outdoor");
 			var div, button, br;
 			
-			for(var i = stops.length -1; i >= 0; i--) {
+			for(var i = floors.length -1; i >= 0; i--) {
 				div = document.createElement("div");
 				div.className = "inline floor";
 				div.innerText = indexToFloor(i) + "층";
@@ -301,7 +302,7 @@
 				
 				button = createButton("▲", "pushUpButton(" + i + ")");
 				button.setAttribute("id", "upButton" + i);
-				if(i == stops.length -1) button.style.visibility = "hidden";
+				if(i == floors.length -1) button.style.visibility = "hidden";
 				outdoor.appendChild(button);
 				
 				button = createButton("▼", "pushDownButton(" + i + ")");
@@ -318,7 +319,7 @@
 			var indoor = document.getElementById("indoor");
 			var button, br;
 			
-			for(var i = stops.length -1; i >= 0; i--) {
+			for(var i = floors.length -1; i >= 0; i--) {
 				button = createButton(indexToFloor(i), "pushIndoorButton(" + i + ")");
 				button.setAttribute("id", "numberButton" + i);
 				indoor.appendChild(button);
